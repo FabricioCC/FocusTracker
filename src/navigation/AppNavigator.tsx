@@ -13,6 +13,7 @@ export type RootStackParamList = {
   Tabs: undefined;
   AddItem: undefined;
   ItemDetail: { itemId: string };
+  AddReminder: undefined;
 };
 
 export type TabParamList = {
@@ -57,6 +58,11 @@ export default function AppNavigator() {
         <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
         <Stack.Screen name="AddItem" component={AddItemScreen} options={{ title: 'New Item', presentation: 'modal' }} />
         <Stack.Screen name="ItemDetail" component={ItemDetailScreen} options={{ title: 'Detail' }} />
+        <Stack.Screen
+            name="AddReminder"
+            component={RemindersScreen}
+            options={{ title: 'New Reminder', presentation: 'modal' }}
+            />
       </Stack.Navigator>
     </NavigationContainer>
   );
