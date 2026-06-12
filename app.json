@@ -16,6 +16,14 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.fabriciodev.focustracker",
+      "permissions": [
+        "USE_EXACT_ALARM",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_FULL_SCREEN_INTENT",
+        "WAKE_LOCK",
+        "RECEIVE_BOOT_COMPLETED"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -27,7 +35,19 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
-    ]
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "color": "#8B3A2A"
+        }
+      ],
+      "./plugins/fullscreenNotification"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "90d7da85-d4d7-4d1a-9802-b19fcbcee5e5"
+      }
+    }
   }
 }

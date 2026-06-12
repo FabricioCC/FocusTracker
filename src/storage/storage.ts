@@ -14,13 +14,17 @@ export async function saveItems(items: Item[]): Promise<void> {
   await AsyncStorage.setItem(ITEMS_KEY, JSON.stringify(items));
 }
 
-export async function addItem(data: Pick<Item, 'title' | 'category' | 'note'>): Promise<Item> {
+export async function addItem(
+  data: Pick<Item, 'title' | 'category' | 'note' | 'total'>
+): Promise<Item> {
   const items = await getItems();
   const newItem: Item = {
     id: Date.now().toString(),
     title: data.title,
     category: data.category,
     status: 'backlog',
+    total: data.total,
+    current: 0,
     progress: 0,
     note: data.note ?? '',
     createdAt: new Date().toISOString(),
@@ -43,19 +47,23 @@ export async function updateItem(id: string, data: Partial<Item>): Promise<void>
 
 export async function logProgress(
   id: string,
-  description: string,
-  percentage: number
+  current: number,
+  description: string
 ): Promise<void> {
   const items = await getItems();
   const updated = items.map(item => {
     if (item.id !== id) return item;
+    const progress = item.total > 0
+      ? Math.min(100, Math.round((current / item.total) * 100))
+      : 0;
     return {
       ...item,
-      progress: percentage,
+      current,
+      progress,
       updatedAt: new Date().toISOString(),
       logs: [
         ...item.logs,
-        { description, percentage, date: new Date().toISOString() },
+        { current, description, date: new Date().toISOString() },
       ],
     };
   });

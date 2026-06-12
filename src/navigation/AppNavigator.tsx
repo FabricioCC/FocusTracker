@@ -1,4 +1,5 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { useRef } from 'react';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,12 +9,14 @@ import ActiveScreen from '../screens/ActiveScreen';
 import RemindersScreen from '../screens/RemidersScreen';
 import AddItemScreen from '../screens/AddItemScreen';
 import ItemDetailScreen from '../screens/ItemDetailScreen';
+import AddReminderScreen from '../screens/AddReminderScreen';
+import { Colors } from '../theme/theme';
 
 export type RootStackParamList = {
   Tabs: undefined;
   AddItem: undefined;
-  ItemDetail: { itemId: string };
   AddReminder: undefined;
+  ItemDetail: { itemId: string };
 };
 
 export type TabParamList = {
@@ -30,9 +33,9 @@ function TabNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: '#6C63FF',
-        tabBarInactiveTintColor: '#999',
-        tabBarStyle: { height: 80 },
+        tabBarActiveTintColor: Colors.crimson,
+        tabBarInactiveTintColor: Colors.faded,
+        tabBarStyle: { height: 80, backgroundColor: Colors.surface, borderTopColor: Colors.border },
         tabBarItemStyle: { paddingBottom: 20 },
         tabBarIcon: ({ color, size }) => {
           const icons: Record<string, string> = {
@@ -51,18 +54,18 @@ function TabNavigator() {
   );
 }
 
-export default function AppNavigator() {
+type Props = {
+  navigationRef: React.RefObject<NavigationContainerRef<RootStackParamList>>;
+};
+
+export default function AppNavigator({ navigationRef }: Props) {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator>
         <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
         <Stack.Screen name="AddItem" component={AddItemScreen} options={{ title: 'New Item', presentation: 'modal' }} />
+        <Stack.Screen name="AddReminder" component={AddReminderScreen} options={{ title: 'New Reminder', presentation: 'modal' }} />
         <Stack.Screen name="ItemDetail" component={ItemDetailScreen} options={{ title: 'Detail' }} />
-        <Stack.Screen
-            name="AddReminder"
-            component={RemindersScreen}
-            options={{ title: 'New Reminder', presentation: 'modal' }}
-            />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -1,17 +1,37 @@
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
 import { getItems } from '../storage/storage';
+import { Platform } from 'react-native';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true,
+    priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
 
 export async function requestPermissions(): Promise<boolean> {
-  const { status } = await Notifications.requestPermissionsAsync();
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('reminders', {
+  name: 'Focus Reminders',
+  importance: Notifications.AndroidImportance.MAX,
+  sound: 'default',
+  enableVibrate: true,
+  vibrationPattern: [0, 500, 200, 500],
+  lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  bypassDnd: true,
+});
+  }
+
+  const { status } = await Notifications.requestPermissionsAsync({
+    android: {
+      allowAlert: true,
+      allowSound: true,
+      allowBadge: true,
+    },
+  } as any);
+
   return status === 'granted';
 }
 
@@ -21,7 +41,8 @@ export async function scheduleReminder(
   body: string,
   hour: number,
   minute: number,
-  days: number[]
+  days: number[],
+  itemId: string
 ): Promise<void> {
   await cancelReminder(id);
 
@@ -31,14 +52,17 @@ export async function scheduleReminder(
       content: {
         title,
         body,
-        sound: true,
-        data: { reminderId: id },
+        sound: 'default',
+        data: { reminderId: id, itemId },
+        priority: 'max',
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
         weekday: day,
         hour,
         minute,
+        second: 0,
+        channelId: 'reminders',
       },
     });
   }
@@ -47,12 +71,12 @@ export async function scheduleReminder(
 export async function cancelReminder(id: string): Promise<void> {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   const toCancel = scheduled.filter(n => n.identifier.startsWith(`${id}_`));
-  await Promise.all(toCancel.map(n => Notifications.cancelScheduledNotificationAsync(n.identifier)));
+  await Promise.all(toCancel.map(n =>
+    Notifications.cancelScheduledNotificationAsync(n.identifier)
+  ));
 }
 
 export async function scheduleAbandonmentCheck(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
-
   const items = await getItems();
   const active = items.filter(i => i.status === 'active' || i.status === 'paused');
 
@@ -65,7 +89,7 @@ export async function scheduleAbandonmentCheck(): Promise<void> {
         identifier: `abandon_${item.id}`,
         content: {
           title: '⚔️ Your quest awaits',
-          body: `It's been ${daysSince} days since you touched "${item.title}". Continue?`,
+          body: `${daysSince} days without progress on "${item.title}". Continue?`,
           sound: true,
           data: { itemId: item.id },
         },
