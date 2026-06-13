@@ -8,8 +8,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getReminders, saveReminders, getItems } from '../storage/storage';
 import { Reminder, Item } from '../data/types';
 import { Colors, Fonts, Radius, Spacing } from '../theme/theme';
-import { requestPermissions, scheduleReminder } from '../notifications/notifications';
-import * as Notifications from 'expo-notifications';
+import { setAlarm, requestAlarmPermission } from '../notifications/alarm';
+import { CATEGORIES, Category, CATEGORY_UNIT } from '../data/types';
+
 
 const DAYS = [
   { label: 'Sun', value: 1 },
@@ -54,23 +55,40 @@ export default function AddReminderScreen() {
   }
 
   async function handleSave() {
-    if (!selectedItem) {
-      Alert.alert('No item selected', 'Move an item to Active first.');
-      return;
-    }
-    if (selectedDays.length === 0) {
-      Alert.alert('No days selected', 'Pick at least one day.');
-      return;
-    }
+  if (!selectedItem) {
+    Alert.alert('No item selected', 'Move an item to Active first.');
+    return;
+  }
+  if (selectedDays.length === 0) {
+    Alert.alert('No days selected', 'Pick at least one day.');
+    return;
+  }
 
-    const granted = await requestPermissions();
-    if (!granted) {
-      Alert.alert('Permission required', 'Enable notifications in your device settings.');
-      return;
-    }
+  const granted = await requestAlarmPermission();
+  if (!granted) {
+    Alert.alert('Permission required', 'Enable notifications in settings.');
+    return;
+  }
+
+  try {
+    const alarmId = Date.now().toString();
+
+    await setAlarm({
+      id: alarmId,
+      itemId: selectedItem.id,
+      itemTitle: selectedItem.title,
+      itemProgress: selectedItem.progress,
+      itemCurrent: selectedItem.current,
+      itemTotal: selectedItem.total,
+      itemUnit: CATEGORY_UNIT[selectedItem.category],
+      hour,
+      minute,
+      days: selectedDays,
+    });
 
     const newReminder: Reminder = {
-      id: Date.now().toString(),
+      id: alarmId,
+      alarmId: parseInt(alarmId) % 100000,
       itemId: selectedItem.id,
       itemTitle: selectedItem.title,
       hour,
@@ -81,22 +99,13 @@ export default function AddReminderScreen() {
 
     const existing = await getReminders();
     await saveReminders([...existing, newReminder]);
-
-    await scheduleReminder(
-      newReminder.id,
-      `⚔️ ${selectedItem.title}`,
-      `Time to make progress on "${selectedItem.title}".`,
-      hour,
-      minute,
-      selectedDays,
-      selectedItem.id  // novo argumento
-    );
-
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    console.log('Scheduled:', JSON.stringify(scheduled, null, 2));
-
+    Alert.alert('Done!', 'Reminder set successfully.');
     navigation.goBack();
+  } catch (e) {
+    console.error('Alarm error:', e);
+    Alert.alert('Error', String(e));
   }
+}
 
   return (
     <SafeAreaView style={styles.container}>

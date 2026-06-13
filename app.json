@@ -1,52 +1,35 @@
 {
   "expo": {
     "name": "FocusTracker",
-    "slug": "FocusTracker",
+    "slug": "focustracker",
     "version": "1.0.0",
-    "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
       "package": "com.fabriciodev.focustracker",
-      "permissions": [
-        "USE_EXACT_ALARM",
-        "SCHEDULE_EXACT_ALARM",
-        "USE_FULL_SCREEN_INTENT",
-        "WAKE_LOCK",
-        "RECEIVE_BOOT_COMPLETED"
-      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#F2E8D5"
       },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+      "permissions": [
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.WAKE_LOCK",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "plugins": [
-      "expo-font",
       [
         "expo-notifications",
         {
           "color": "#8B3A2A"
         }
       ],
-      "./plugins/fullscreenNotification"
+      "./modules/alarm/app.plugin.js"
     ],
     "extra": {
       "eas": {
-        "projectId": "90d7da85-d4d7-4d1a-9802-b19fcbcee5e5"
+        "projectId": "be554103-c98f-4b7a-bb6b-0687a5c218e2"
       }
     }
   }
