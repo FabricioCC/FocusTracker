@@ -1,22 +1,15 @@
 export const Colors = {
-  // backgrounds
   base: '#F2E8D5',
   surface: '#FBF4E6',
   aged: '#E8D9BE',
   border: '#C9A87A',
-
-  // texto
   ink: '#2A1A0A',
   sepia: '#5A3A1A',
   faded: '#8C7055',
-
-  // acentos
   crimson: '#8B3A2A',
   oak: '#6B4C2A',
   gold: '#B8860B',
   forest: '#2A4A2A',
-
-  // categorias
   category: {
     book:     { bg: '#D4C4E8', text: '#3A2060', bar: '#5A3A9A' },
     movie:    { bg: '#E8C4B0', text: '#6A2A10', bar: '#A04020' },
@@ -26,8 +19,6 @@ export const Colors = {
     course:   { bg: '#B8DCC8', text: '#1A4A2A', bar: '#2A7A48' },
     tech_book:{ bg: '#D4C4E8', text: '#3A2060', bar: '#5A3A9A' },
   },
-
-  // status
   status: {
     backlog:   '#8C7055',
     active:    '#2A7A48',
@@ -37,11 +28,11 @@ export const Colors = {
 };
 
 export const Fonts = {
-  heading: 'Cinzel_700Bold',
-  headingRegular: 'Cinzel_400Regular',
-  body: 'Lora_400Regular',
-  bodyItalic: 'Lora_400Regular_Italic',
-  bodySemiBold: 'Lora_600SemiBold',
+  heading: 'Inter_700Bold',
+  headingSemiBold: 'Inter_600SemiBold',
+  body: 'Inter_400Regular',
+  bodySemiBold: 'Inter_500Medium',
+  bodyItalic: 'Inter_400Regular',
 };
 
 export const Radius = {

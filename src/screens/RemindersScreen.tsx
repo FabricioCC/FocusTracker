@@ -9,6 +9,9 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getReminders, saveReminders } from '../storage/storage';
 import { Reminder } from '../data/types';
 import { Colors, Fonts, Radius, Spacing } from '../theme/theme';
+import { registerBackgroundTask } from '../notifications/backgroundTask';
+import * as BackgroundFetch from 'expo-background-fetch';
+import * as TaskManager from 'expo-task-manager';
 import { requestPermissions, scheduleReminder, cancelReminder } from '../notifications/notifications';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -130,6 +133,28 @@ export default function RemindersScreen() {
           <Text style={styles.addButtonText}>+ New</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+  style={{ 
+    margin: Spacing.lg, 
+    padding: Spacing.sm, 
+    backgroundColor: Colors.oak, 
+    borderRadius: Radius.md,
+    alignItems: 'center'
+  }}
+  onPress={async () => {
+    try {
+      await BackgroundFetch.fetchAsync('check-abandonment');
+      Alert.alert('Done', 'Abandonment check ran successfully.');
+    } catch (e) {
+      Alert.alert('Error', String(e));
+    }
+  }}
+>
+  <Text style={{ fontFamily: Fonts.heading, color: Colors.surface, fontSize: 12, letterSpacing: 1 }}>
+    TEST ABANDONMENT CHECK
+  </Text>
+</TouchableOpacity>
 
       {reminders.length === 0 ? (
         <View style={styles.empty}>

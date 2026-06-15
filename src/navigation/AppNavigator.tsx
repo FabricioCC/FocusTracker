@@ -1,16 +1,18 @@
-import { useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Colors, Fonts } from '../theme/theme';
 
 import BacklogScreen from '../screens/BacklogScreen';
-import ActiveScreen from '../screens/ActiveScreen';
-import RemindersScreen from '../screens/RemidersScreen';
+import PomodoroScreen from '../screens/PomodoroScreen';
+import NotesScreen from '../screens/NotesScreen';
+import TasksScreen from '../screens/TasksScreen';
+import RemindersScreen from '../screens/RemindersScreen';
 import AddItemScreen from '../screens/AddItemScreen';
 import ItemDetailScreen from '../screens/ItemDetailScreen';
 import AddReminderScreen from '../screens/AddReminderScreen';
-import { Colors } from '../theme/theme';
 
 export type RootStackParamList = {
   Tabs: undefined;
@@ -21,34 +23,56 @@ export type RootStackParamList = {
 
 export type TabParamList = {
   Backlog: undefined;
-  Active: undefined;
+  Focus: undefined;
+  Notes: undefined;
+  Tasks: undefined;
   Reminders: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 
+const TAB_ICONS: Record<string, string> = {
+  Backlog: 'list-outline',
+  Focus: 'timer-outline',
+  Notes: 'document-text-outline',
+  Tasks: 'checkmark-square-outline',
+  Reminders: 'alarm-outline',
+};
+
 function TabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarActiveBackgroundColor: Colors.aged,
         tabBarActiveTintColor: Colors.crimson,
         tabBarInactiveTintColor: Colors.faded,
-        tabBarStyle: { height: 80, backgroundColor: Colors.surface, borderTopColor: Colors.border },
-        tabBarItemStyle: { paddingBottom: 20 },
-        tabBarIcon: ({ color, size }) => {
-          const icons: Record<string, string> = {
-            Backlog: 'list-outline',
-            Active: 'play-circle-outline',
-            Reminders: 'alarm-outline',
-          };
-          return <Ionicons name={icons[route.name] as any} size={size} color={color} />;
+        tabBarStyle: {
+          height: 100,
+          backgroundColor: Colors.surface,
+          borderTopColor: Colors.border,
+          marginBottom: 5,
+          borderTopWidth: 0.5,
         },
+        tabBarLabelStyle: {
+          fontFamily: Fonts.bodySemiBold,
+          fontSize: 10,
+          letterSpacing: 0.3,
+        },
+        tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons
+              name={TAB_ICONS[route.name] as any}
+              size={22}
+              color={color}
+            />
+        ),
       })}
     >
       <Tab.Screen name="Backlog" component={BacklogScreen} />
-      <Tab.Screen name="Active" component={ActiveScreen} />
+      <Tab.Screen name="Focus" component={PomodoroScreen} />
+      <Tab.Screen name="Notes" component={NotesScreen} />
+      <Tab.Screen name="Tasks" component={TasksScreen} />
       <Tab.Screen name="Reminders" component={RemindersScreen} />
     </Tab.Navigator>
   );
