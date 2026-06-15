@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  FlatList, TextInput, Alert
+  FlatList, TextInput, Alert, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Fonts, Spacing, Radius } from '../theme/theme';
+import { useEntrance, usePressScale } from '../hooks/useEntrance';
 
 interface Task {
   id: string;
@@ -16,10 +17,74 @@ interface Task {
 
 const TASKS_KEY = '@focustracker:tasks';
 
+// Individual animated task row
+function AnimatedTaskRow({ item, onToggle, onDelete }: {
+  item: Task;
+  onToggle: () => void;
+  onDelete: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateX = useRef(new Animated.Value(-20)).current;
+  const checkScale = useRef(new Animated.Value(1)).current;
+  const { scale, onPressIn, onPressOut } = usePressScale(0.97);
+
+  // Mount entrance
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.spring(translateX, { toValue: 0, speed: 18, bounciness: 4, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  function handleToggle() {
+    // Pulse the checkbox
+    Animated.sequence([
+      Animated.spring(checkScale, { toValue: 1.3, speed: 40, bounciness: 10, useNativeDriver: true }),
+      Animated.spring(checkScale, { toValue: 1, speed: 30, bounciness: 6, useNativeDriver: true }),
+    ]).start();
+    onToggle();
+  }
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateX }, { scale }] }}>
+      <TouchableOpacity
+        style={styles.taskRow}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        onPress={handleToggle}
+        activeOpacity={1}
+      >
+        <Animated.View
+          style={[
+            styles.checkbox,
+            item.done && { backgroundColor: Colors.forest, borderColor: Colors.forest },
+            { transform: [{ scale: checkScale }] },
+          ]}
+        >
+          {item.done && <Text style={styles.checkmark}>✓</Text>}
+        </Animated.View>
+        <Text style={[styles.taskText, item.done && styles.taskDone]} numberOfLines={2}>
+          {item.text}
+        </Text>
+        <TouchableOpacity onPress={onDelete} activeOpacity={0.7}>
+          <Text style={styles.deleteText}>✕</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function TasksScreen() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [input, setInput] = useState('');
   const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('all');
+
+  // Header entrance
+  const { opacity: headerOpacity, translateY: headerY } = useEntrance(0);
+  // Stats entrance
+  const { opacity: statsOpacity, translateY: statsY } = useEntrance(60);
+  // Input entrance
+  const { opacity: inputOpacity, translateY: inputY } = useEntrance(120);
 
   useEffect(() => { loadTasks(); }, []);
 
@@ -83,37 +148,28 @@ export default function TasksScreen() {
 
   function renderTask({ item }: { item: Task }) {
     return (
-      <View style={styles.taskRow}>
-        <TouchableOpacity
-          style={[styles.checkbox, item.done && { backgroundColor: Colors.forest, borderColor: Colors.forest }]}
-          onPress={() => toggleTask(item.id)}
-          activeOpacity={0.75}
-        >
-          {item.done && <Text style={styles.checkmark}>✓</Text>}
-        </TouchableOpacity>
-        <Text style={[styles.taskText, item.done && styles.taskDone]} numberOfLines={2}>
-          {item.text}
-        </Text>
-        <TouchableOpacity onPress={() => deleteTask(item.id)} activeOpacity={0.7}>
-          <Text style={styles.deleteText}>✕</Text>
-        </TouchableOpacity>
-      </View>
+      <AnimatedTaskRow
+        key={item.id}
+        item={item}
+        onToggle={() => toggleTask(item.id)}
+        onDelete={() => deleteTask(item.id)}
+      />
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <Animated.View style={[styles.header, { opacity: headerOpacity, transform: [{ translateY: headerY }] }]}>
         <Text style={styles.heading}>Tasks</Text>
         {done > 0 && (
           <TouchableOpacity onPress={clearDone} activeOpacity={0.75}>
             <Text style={styles.clearText}>Clear done</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </Animated.View>
 
       {/* Stats */}
-      <View style={styles.statsRow}>
+      <Animated.View style={[styles.statsRow, { opacity: statsOpacity, transform: [{ translateY: statsY }] }]}>
         <View style={styles.stat}>
           <Text style={[styles.statNum, { color: Colors.crimson }]}>{pending}</Text>
           <Text style={styles.statLabel}>pending</Text>
@@ -128,10 +184,10 @@ export default function TasksScreen() {
           <Text style={[styles.statNum, { color: Colors.oak }]}>{tasks.length}</Text>
           <Text style={styles.statLabel}>total</Text>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Filter */}
-      <View style={styles.filterRow}>
+      <Animated.View style={[styles.filterRow, { opacity: inputOpacity, transform: [{ translateY: inputY }] }]}>
         {(['all', 'pending', 'done'] as const).map(f => (
           <TouchableOpacity
             key={f}
@@ -144,10 +200,10 @@ export default function TasksScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </Animated.View>
 
       {/* Input */}
-      <View style={styles.inputRow}>
+      <Animated.View style={[styles.inputRow, { opacity: inputOpacity, transform: [{ translateY: inputY }] }]}>
         <TextInput
           style={styles.input}
           placeholder="Add a task..."
@@ -160,7 +216,7 @@ export default function TasksScreen() {
         <TouchableOpacity style={styles.addBtn} onPress={addTask} activeOpacity={0.8}>
           <Text style={styles.addBtnText}>Add</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* List */}
       {filtered.length === 0 ? (

@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  FlatList, TextInput, Alert, Modal, KeyboardAvoidingView, Platform
+  FlatList, TextInput, Alert, Modal, KeyboardAvoidingView, Platform, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, Fonts, Spacing, Radius } from '../theme/theme';
+import { useEntrance, usePressScale } from '../hooks/useEntrance';
 
 interface Note {
   id: string;
@@ -17,6 +18,56 @@ interface Note {
 
 const NOTES_KEY = '@focustracker:notes';
 
+// Animated note card
+function AnimatedNoteCard({ item, index, onPress, onDelete }: {
+  item: Note;
+  index: number;
+  onPress: () => void;
+  onDelete: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(20)).current;
+  const { scale, onPressIn, onPressOut } = usePressScale(0.97);
+
+  useEffect(() => {
+    const delay = Math.min(index * 60, 360);
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 300, delay, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, speed: 14, bounciness: 4, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  function formatDate(iso: string) {
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric'
+    });
+  }
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }, { scale }] }}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={1}
+      >
+        <View style={styles.cardAccent} />
+        <View style={styles.cardContent}>
+          <Text style={styles.noteTitle} numberOfLines={1}>{item.title}</Text>
+          {item.body ? (
+            <Text style={styles.noteBody} numberOfLines={2}>{item.body}</Text>
+          ) : null}
+          <Text style={styles.noteDate}>{formatDate(item.updatedAt)}</Text>
+        </View>
+        <TouchableOpacity onPress={onDelete} activeOpacity={0.7} style={styles.deleteBtn}>
+          <Text style={styles.deleteText}>✕</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function NotesScreen() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -24,16 +75,26 @@ export default function NotesScreen() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [search, setSearch] = useState('');
+  const [listKey, setListKey] = useState(0);
+
+  // Header entrance
+  const { opacity: headerOpacity, translateY: headerY } = useEntrance(0);
+  // Search entrance
+  const { opacity: searchOpacity, translateY: searchY } = useEntrance(80);
 
   useEffect(() => { loadNotes(); }, []);
 
   async function loadNotes() {
     const json = await AsyncStorage.getItem(NOTES_KEY);
-    if (json) setNotes(JSON.parse(json));
+    if (json) {
+      setNotes(JSON.parse(json));
+      setListKey(k => k + 1);
+    }
   }
 
   async function saveNotes(updated: Note[]) {
     setNotes(updated);
+    setListKey(k => k + 1);
     await AsyncStorage.setItem(NOTES_KEY, JSON.stringify(updated));
   }
 
@@ -87,50 +148,34 @@ export default function NotesScreen() {
     ]);
   }
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      day: '2-digit', month: 'short', year: 'numeric'
-    });
-  }
-
   const filtered = notes.filter(n =>
     n.title.toLowerCase().includes(search.toLowerCase()) ||
     n.body.toLowerCase().includes(search.toLowerCase())
   );
 
-  function renderNote({ item }: { item: Note }) {
+  function renderNote({ item, index }: { item: Note; index: number }) {
     return (
-      <TouchableOpacity
-        style={styles.card}
+      <AnimatedNoteCard
+        key={`${item.id}-${listKey}`}
+        item={item}
+        index={index}
         onPress={() => openEdit(item)}
-        activeOpacity={0.75}
-      >
-        <View style={styles.cardAccent} />
-        <View style={styles.cardContent}>
-          <Text style={styles.noteTitle} numberOfLines={1}>{item.title}</Text>
-          {item.body ? (
-            <Text style={styles.noteBody} numberOfLines={2}>{item.body}</Text>
-          ) : null}
-          <Text style={styles.noteDate}>{formatDate(item.updatedAt)}</Text>
-        </View>
-        <TouchableOpacity onPress={() => deleteNote(item.id)} activeOpacity={0.7} style={styles.deleteBtn}>
-          <Text style={styles.deleteText}>✕</Text>
-        </TouchableOpacity>
-      </TouchableOpacity>
+        onDelete={() => deleteNote(item.id)}
+      />
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <Animated.View style={[styles.header, { opacity: headerOpacity, transform: [{ translateY: headerY }] }]}>
         <Text style={styles.heading}>Notes</Text>
         <TouchableOpacity style={styles.addButton} onPress={openNew} activeOpacity={0.8}>
           <Text style={styles.addButtonText}>+ New</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Search */}
-      <View style={styles.searchRow}>
+      <Animated.View style={[styles.searchRow, { opacity: searchOpacity, transform: [{ translateY: searchY }] }]}>
         <TextInput
           style={styles.searchInput}
           placeholder="Search notes..."
@@ -138,11 +183,13 @@ export default function NotesScreen() {
           value={search}
           onChangeText={setSearch}
         />
-      </View>
+      </Animated.View>
 
       {/* Count */}
       {notes.length > 0 && (
-        <Text style={styles.countText}>{filtered.length} note{filtered.length !== 1 ? 's' : ''}</Text>
+        <Animated.Text style={[styles.countText, { opacity: searchOpacity }]}>
+          {filtered.length} note{filtered.length !== 1 ? 's' : ''}
+        </Animated.Text>
       )}
 
       {/* List */}
@@ -157,6 +204,7 @@ export default function NotesScreen() {
         </View>
       ) : (
         <FlatList
+          key={listKey}
           data={filtered}
           keyExtractor={n => n.id}
           renderItem={renderNote}

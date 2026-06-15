@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, SafeAreaView
+  View, Text, TouchableOpacity, StyleSheet, Animated
 } from 'react-native';
-import { SafeAreaView as SafeArea } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Fonts, Spacing, Radius } from '../theme/theme';
+import { useEntrance, usePressScale } from '../hooks/useEntrance';
 
 const MODES = {
   focus: { label: 'Focus', duration: 25 * 60, color: Colors.crimson },
@@ -19,6 +20,36 @@ export default function PomodoroScreen() {
   const [running, setRunning] = useState(false);
   const [rounds, setRounds] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Entrance animations
+  const { opacity: headerOpacity, translateY: headerY } = useEntrance(0);
+  const { opacity: modeOpacity, translateY: modeY } = useEntrance(80);
+  const { opacity: timerOpacity, translateY: timerY } = useEntrance(160);
+  const { opacity: controlsOpacity, translateY: controlsY } = useEntrance(240);
+
+  // Timer circle pulse when running
+  const circleScale = useRef(new Animated.Value(1)).current;
+  const pulseAnim = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Play button press scale
+  const { scale: playScale, onPressIn: playPressIn, onPressOut: playPressOut } = usePressScale(0.93);
+
+  useEffect(() => {
+    if (running) {
+      // Subtle breathing pulse when timer is running
+      pulseAnim.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(circleScale, { toValue: 1.015, duration: 1800, useNativeDriver: true }),
+          Animated.timing(circleScale, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        ])
+      );
+      pulseAnim.current.start();
+    } else {
+      pulseAnim.current?.stop();
+      Animated.spring(circleScale, { toValue: 1, speed: 20, bounciness: 4, useNativeDriver: true }).start();
+    }
+    return () => pulseAnim.current?.stop();
+  }, [running]);
 
   useEffect(() => {
     if (running) {
@@ -60,24 +91,17 @@ export default function PomodoroScreen() {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
 
-  // círculo SVG
-  const size = 220;
-  const stroke = 8;
-  const r = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * r;
-  const strokeDashoffset = circumference * (1 - progress);
-
   return (
-    <SafeArea style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={styles.container}>
+      <Animated.View style={[styles.header, { opacity: headerOpacity, transform: [{ translateY: headerY }] }]}>
         <Text style={styles.heading}>Focus</Text>
         <View style={styles.roundsBadge}>
           <Text style={styles.roundsText}>{rounds} rounds</Text>
         </View>
-      </View>
+      </Animated.View>
 
       {/* Mode selector */}
-      <View style={styles.modeRow}>
+      <Animated.View style={[styles.modeRow, { opacity: modeOpacity, transform: [{ translateY: modeY }] }]}>
         {(Object.keys(MODES) as Mode[]).map(m => (
           <TouchableOpacity
             key={m}
@@ -90,43 +114,48 @@ export default function PomodoroScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </Animated.View>
 
       {/* Timer circle */}
-      <View style={styles.timerContainer}>
-        <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-          {/* SVG via View trick — usando bordas */}
-          <View style={[styles.circleOuter, { borderColor: Colors.aged }]}>
-            <View style={[styles.circleProgress, {
-              borderColor: color,
-              transform: [{ rotate: `${progress * 360 - 90}deg` }],
-            }]} />
-            <View style={styles.circleInner}>
-              <Text style={styles.timerMode}>{MODES[mode].label.toUpperCase()}</Text>
-              <Text style={[styles.timerTime, { color: Colors.ink }]}>
-                {pad(mins)}:{pad(secs)}
-              </Text>
-              <Text style={styles.timerSub}>
-                {seconds === 0 ? 'done!' : running ? 'in progress' : 'paused'}
-              </Text>
+      <Animated.View style={[styles.timerContainer, { opacity: timerOpacity, transform: [{ translateY: timerY }] }]}>
+        <Animated.View style={{ transform: [{ scale: circleScale }] }}>
+          <View style={{ width: 220, height: 220, alignItems: 'center', justifyContent: 'center' }}>
+            <View style={[styles.circleOuter, { borderColor: Colors.aged }]}>
+              <View style={[styles.circleProgress, {
+                borderColor: color,
+                transform: [{ rotate: `${progress * 360 - 90}deg` }],
+              }]} />
+              <View style={styles.circleInner}>
+                <Text style={styles.timerMode}>{MODES[mode].label.toUpperCase()}</Text>
+                <Text style={[styles.timerTime, { color: Colors.ink }]}>
+                  {pad(mins)}:{pad(secs)}
+                </Text>
+                <Text style={styles.timerSub}>
+                  {seconds === 0 ? 'done!' : running ? 'in progress' : 'paused'}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
-      </View>
+        </Animated.View>
+      </Animated.View>
 
       {/* Controls */}
-      <View style={styles.controls}>
+      <Animated.View style={[styles.controls, { opacity: controlsOpacity, transform: [{ translateY: controlsY }] }]}>
         <TouchableOpacity style={styles.resetBtn} onPress={reset} activeOpacity={0.75}>
           <Text style={styles.resetBtnText}>Reset</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.playBtn, { backgroundColor: color }]}
-          onPress={() => setRunning(r => !r)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.playBtnText}>{running ? 'Pause' : seconds === 0 ? 'Done' : 'Start'}</Text>
-        </TouchableOpacity>
+        <Animated.View style={{ transform: [{ scale: playScale }] }}>
+          <TouchableOpacity
+            style={[styles.playBtn, { backgroundColor: color }]}
+            onPress={() => setRunning(r => !r)}
+            onPressIn={playPressIn}
+            onPressOut={playPressOut}
+            activeOpacity={1}
+          >
+            <Text style={styles.playBtnText}>{running ? 'Pause' : seconds === 0 ? 'Done' : 'Start'}</Text>
+          </TouchableOpacity>
+        </Animated.View>
 
         <TouchableOpacity
           style={styles.resetBtn}
@@ -135,22 +164,41 @@ export default function PomodoroScreen() {
         >
           <Text style={styles.resetBtnText}>Clear</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
-      {/* Rounds */}
-      <View style={styles.dotsRow}>
+      {/* Rounds dots */}
+      <Animated.View style={[styles.dotsRow, { opacity: controlsOpacity }]}>
         {Array.from({ length: Math.min(rounds, 8) }).map((_, i) => (
-          <View key={i} style={[styles.dot, { backgroundColor: Colors.crimson }]} />
+          <RoundDot key={i} filled delay={i * 40} />
         ))}
         {Array.from({ length: Math.max(0, 4 - rounds % 4) % 4 }).map((_, i) => (
-          <View key={`e${i}`} style={[styles.dot, { backgroundColor: Colors.aged }]} />
+          <RoundDot key={`e${i}`} filled={false} delay={0} />
         ))}
-      </View>
-      <Text style={styles.dotsLabel}>
+      </Animated.View>
+      <Animated.Text style={[styles.dotsLabel, { opacity: controlsOpacity }]}>
         {rounds > 0 ? `${rounds} focus session${rounds > 1 ? 's' : ''} today` : 'No sessions yet'}
-      </Text>
+      </Animated.Text>
+    </SafeAreaView>
+  );
+}
 
-    </SafeArea>
+function RoundDot({ filled, delay }: { filled: boolean; delay: number }) {
+  const scale = useRef(new Animated.Value(filled ? 0 : 1)).current;
+
+  useEffect(() => {
+    if (filled) {
+      Animated.spring(scale, { toValue: 1, speed: 20, bounciness: 10, delay, useNativeDriver: true }).start();
+    }
+  }, [filled]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.dot,
+        { backgroundColor: filled ? Colors.crimson : Colors.aged },
+        { transform: [{ scale }] },
+      ]}
+    />
   );
 }
 

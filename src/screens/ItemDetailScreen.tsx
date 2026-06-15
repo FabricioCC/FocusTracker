@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, TextInput, Alert, AppState
+  ScrollView, TextInput, Alert, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getItems, updateItem, logProgress } from '../storage/storage';
 import { Item, CATEGORIES, Status, CATEGORY_UNIT } from '../data/types';
 import { Colors, Fonts, Radius, Spacing } from '../theme/theme';
+import { usePressScale } from '../hooks/useEntrance';
 
 type Route = RouteProp<RootStackParamList, 'ItemDetail'>;
 
@@ -25,6 +26,80 @@ const STATUS_COLORS: Record<Status, string> = {
   paused: Colors.gold,
   completed: Colors.oak,
 };
+
+// Animated section that fades + slides in with a stagger delay
+function AnimatedSection({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 320, delay, useNativeDriver: true }),
+      Animated.spring(translateY, { toValue: 0, speed: 14, bounciness: 3, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+// Animated progress bar
+function AnimatedProgressBar({ progress, color }: { progress: number; color: string }) {
+  const widthAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(widthAnim, {
+      toValue: progress,
+      speed: 6,
+      bounciness: 2,
+      delay: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
+
+  const width = widthAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+
+  return (
+    <View style={styles.progressBg}>
+      <Animated.View style={[styles.progressFill, { width, backgroundColor: color }]} />
+    </View>
+  );
+}
+
+// Animated status button with press scale
+function StatusButton({ status, active, color, onPress }: {
+  status: Status;
+  active: boolean;
+  color: string;
+  onPress: () => void;
+}) {
+  const { scale, onPressIn, onPressOut } = usePressScale(0.93);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TouchableOpacity
+        style={[
+          styles.statusBtn,
+          active && { backgroundColor: color + '22', borderColor: color },
+        ]}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={1}
+      >
+        <Text style={[styles.statusBtnText, { color: active ? color : Colors.faded }]}>
+          {STATUS_LABELS[status].toUpperCase()}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
 
 export default function ItemDetailScreen() {
   const navigation = useNavigation();
@@ -79,99 +154,90 @@ export default function ItemDetailScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
 
         {/* Header */}
-        <View style={styles.topRow}>
-          <View style={[styles.badge, { backgroundColor: cat.bg }]}>
-            <Text style={[styles.badgeText, { color: cat.text }]}>
-              {CATEGORIES[item.category].toUpperCase()}
+        <AnimatedSection delay={0}>
+          <View style={styles.topRow}>
+            <View style={[styles.badge, { backgroundColor: cat.bg }]}>
+              <Text style={[styles.badgeText, { color: cat.text }]}>
+                {CATEGORIES[item.category].toUpperCase()}
+              </Text>
+            </View>
+            <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[item.status] }]} />
+            <Text style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}>
+              {STATUS_LABELS[item.status]}
             </Text>
           </View>
-          <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[item.status] }]} />
-          <Text style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}>
-            {STATUS_LABELS[item.status]}
-          </Text>
-        </View>
 
-        <Text style={styles.title}>{item.title}</Text>
-        {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+          <Text style={styles.title}>{item.title}</Text>
+          {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+        </AnimatedSection>
 
         <View style={styles.divider} />
 
         {/* Progress */}
-        <Text style={styles.sectionLabel}>Progress</Text>
-        <View style={styles.progressRow}>
-          <View style={styles.progressBg}>
-            <View style={[
-              styles.progressFill,
-              { width: `${item.progress}%`, backgroundColor: cat.bar }
-            ]} />
+        <AnimatedSection delay={100}>
+          <Text style={styles.sectionLabel}>Progress</Text>
+          <View style={styles.progressRow}>
+            <AnimatedProgressBar progress={item.progress} color={cat.bar} />
+            <Text style={[styles.progressPct, { color: cat.bar }]}>{item.progress}%</Text>
           </View>
-          <Text style={[styles.progressPct, { color: cat.bar }]}>{item.progress}%</Text>
-        </View>
-        <Text style={styles.progressDetail}>
-          {item.current} / {item.total} {unit}
-        </Text>
+          <Text style={styles.progressDetail}>
+            {item.current} / {item.total} {unit}
+          </Text>
+        </AnimatedSection>
 
         {/* Log progress */}
         {item.status === 'active' && (
-          <View style={styles.logBox}>
-            <Text style={styles.sectionLabel}>Update Progress</Text>
-            <View style={styles.logRow}>
+          <AnimatedSection delay={180}>
+            <View style={styles.logBox}>
+              <Text style={styles.sectionLabel}>Update Progress</Text>
+              <View style={styles.logRow}>
+                <TextInput
+                  style={[styles.input, styles.inputSmall]}
+                  placeholder={`Current ${unit}`}
+                  placeholderTextColor={Colors.faded}
+                  value={currentInput}
+                  onChangeText={setCurrentInput}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.totalHint}>/ {item.total} {unit}</Text>
+              </View>
               <TextInput
-                style={[styles.input, styles.inputSmall]}
-                placeholder={`Current ${unit}`}
+                style={styles.input}
+                placeholder="Note (optional)"
                 placeholderTextColor={Colors.faded}
-                value={currentInput}
-                onChangeText={setCurrentInput}
-                keyboardType="numeric"
+                value={logNote}
+                onChangeText={setLogNote}
               />
-              <Text style={styles.totalHint}>/ {item.total} {unit}</Text>
+              <TouchableOpacity style={styles.logBtn} onPress={handleLogProgress} activeOpacity={0.8}>
+                <Text style={styles.logBtnText}>Save Progress</Text>
+              </TouchableOpacity>
             </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Note (optional)"
-              placeholderTextColor={Colors.faded}
-              value={logNote}
-              onChangeText={setLogNote}
-            />
-            <TouchableOpacity style={styles.logBtn} onPress={handleLogProgress} activeOpacity={0.8}>
-              <Text style={styles.logBtnText}>Save Progress</Text>
-            </TouchableOpacity>
-          </View>
+          </AnimatedSection>
         )}
 
         <View style={styles.divider} />
 
         {/* Status */}
-        <Text style={styles.sectionLabel}>Change Status</Text>
-        <View style={styles.statusGrid}>
-          {(Object.keys(STATUS_LABELS) as Status[]).map(s => (
-            <TouchableOpacity
-              key={s}
-              style={[
-                styles.statusBtn,
-                item.status === s && {
-                  backgroundColor: STATUS_COLORS[s] + '22',
-                  borderColor: STATUS_COLORS[s],
-                },
-              ]}
-              onPress={() => handleStatusChange(s)}
-              activeOpacity={0.75}
-            >
-              <Text style={[
-                styles.statusBtnText,
-                { color: item.status === s ? STATUS_COLORS[s] : Colors.faded },
-              ]}>
-                {STATUS_LABELS[s].toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <AnimatedSection delay={260}>
+          <Text style={styles.sectionLabel}>Change Status</Text>
+          <View style={styles.statusGrid}>
+            {(Object.keys(STATUS_LABELS) as Status[]).map(s => (
+              <StatusButton
+                key={s}
+                status={s}
+                active={item.status === s}
+                color={STATUS_COLORS[s]}
+                onPress={() => handleStatusChange(s)}
+              />
+            ))}
+          </View>
+        </AnimatedSection>
 
         <View style={styles.divider} />
 
         {/* History */}
         {item.logs.length > 0 && (
-          <>
+          <AnimatedSection delay={340}>
             <Text style={styles.sectionLabel}>History</Text>
             {[...item.logs].reverse().map((log, i) => (
               <View key={i} style={styles.logItem}>
@@ -189,7 +255,7 @@ export default function ItemDetailScreen() {
                 </View>
               </View>
             ))}
-          </>
+          </AnimatedSection>
         )}
 
       </ScrollView>
@@ -240,38 +306,6 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.heading, fontSize: 13,
     color: Colors.surface, letterSpacing: 1,
   },
-  pomodoroCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 0.5, borderColor: Colors.border,
-    padding: Spacing.lg, alignItems: 'center', gap: Spacing.sm,
-  },
-  pomodoroMode: {
-    fontFamily: Fonts.heading, fontSize: 12,
-    color: Colors.faded, letterSpacing: 2,
-  },
-  pomodoroTime: {
-    fontFamily: Fonts.heading, fontSize: 52,
-    color: Colors.ink, letterSpacing: 2,
-  },
-  pomodoroBarBg: {
-    width: '100%', height: 4,
-    backgroundColor: Colors.aged, borderRadius: 2, overflow: 'hidden',
-  },
-  pomodoroBarFill: { height: 4, borderRadius: 2 },
-  pomodoroButtons: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
-  pomodoroBtn: {
-    borderRadius: Radius.md, paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.sm,
-  },
-  pomodoroBtnText: {
-    fontFamily: Fonts.heading, fontSize: 14,
-    color: Colors.surface, letterSpacing: 1,
-  },
-  pomodoroResetBtn: {
-    borderRadius: Radius.md, paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm, borderWidth: 0.5, borderColor: Colors.border,
-  },
-  pomodoroResetText: { fontFamily: Fonts.bodyItalic, fontSize: 14, color: Colors.faded },
   statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   statusBtn: {
     borderRadius: Radius.sm, paddingHorizontal: Spacing.md,

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  SectionList, ScrollView
+  SectionList, ScrollView, Animated
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getItems } from '../storage/storage';
 import { Item, CATEGORIES, Category, Status } from '../data/types';
 import { Colors, Fonts, Radius, Spacing } from '../theme/theme';
+import { useEntrance, usePressScale } from '../hooks/useEntrance';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -32,10 +33,108 @@ const STATUS_COLORS: Record<Status, string> = {
   completed: Colors.oak,
 };
 
+// Animated card wrapper
+function AnimatedCard({ item, index, onPress, onEdit }: {
+  item: Item;
+  index: number;
+  onPress: () => void;
+  onEdit: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(24)).current;
+  const { scale, onPressIn, onPressOut } = usePressScale();
+
+  useEffect(() => {
+    const delay = Math.min(index * 55, 380);
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 300,
+        delay,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        speed: 14,
+        bounciness: 5,
+        delay,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
+  const cat = Colors.category[item.category];
+  const daysSince = Math.floor(
+    (Date.now() - new Date(item.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }, { scale }] }}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        activeOpacity={1}
+      >
+        <View style={[styles.cardAccent, { backgroundColor: cat.bar }]} />
+        <View style={styles.cardContent}>
+          <View style={styles.cardTopRow}>
+            <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+            <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[item.status] }]} />
+          </View>
+
+          {item.status !== 'backlog' && (
+            <View style={styles.progressRow}>
+              <View style={styles.progressBg}>
+                <Animated.View style={[styles.progressFill, { width: `${item.progress}%`, backgroundColor: cat.bar }]} />
+              </View>
+              <Text style={[styles.progressPct, { color: cat.bar }]}>{item.progress}%</Text>
+            </View>
+          )}
+
+          <View style={styles.cardBottomRow}>
+            <View style={[styles.badge, { backgroundColor: cat.bg }]}>
+              <Text style={[styles.badgeText, { color: cat.text }]}>
+                {CATEGORIES[item.category].toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.cardActions}>
+              {item.status !== 'backlog' && (
+                <Text style={[
+                  styles.daysAgo,
+                  daysSince >= 5 && { color: Colors.crimson }
+                ]}>
+                  {daysSince === 0 ? 'today' : `${daysSince}d ago`}
+                </Text>
+              )}
+              <TouchableOpacity
+                onPress={onEdit}
+                activeOpacity={0.7}
+                style={styles.editBtn}
+              >
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 export default function BacklogScreen() {
   const [items, setItems] = useState<Item[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const navigation = useNavigation<Nav>();
+
+  // Header entrance
+  const { opacity: headerOpacity, translateY: headerY } = useEntrance(0);
+  // Filters entrance
+  const { opacity: filtersOpacity, translateY: filtersY } = useEntrance(80);
+
+  // Track item count changes to re-key the list for entrance anim
+  const [listKey, setListKey] = useState(0);
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', loadItems);
@@ -45,6 +144,7 @@ export default function BacklogScreen() {
   async function loadItems() {
     const all = await getItems();
     setItems(all);
+    setListKey(k => k + 1);
   }
 
   const filtered = items.filter(i => {
@@ -67,60 +167,19 @@ export default function BacklogScreen() {
     completed: items.filter(i => i.status === 'completed').length,
   };
 
+  // Build flat index map for stagger
+  const flatItems = sections.flatMap(s => s.data);
+
   function renderItem({ item }: { item: Item }) {
-    const cat = Colors.category[item.category];
-    const daysSince = Math.floor(
-      (Date.now() - new Date(item.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
-    );
-
+    const index = flatItems.indexOf(item);
     return (
-      <TouchableOpacity
-        style={styles.card}
+      <AnimatedCard
+        key={`${item.id}-${listKey}`}
+        item={item}
+        index={index}
         onPress={() => navigation.navigate('ItemDetail', { itemId: item.id })}
-        activeOpacity={0.75}
-      >
-        <View style={[styles.cardAccent, { backgroundColor: cat.bar }]} />
-        <View style={styles.cardContent}>
-          <View style={styles.cardTopRow}>
-            <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-            <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[item.status] }]} />
-          </View>
-
-          {item.status !== 'backlog' && (
-            <View style={styles.progressRow}>
-              <View style={styles.progressBg}>
-                <View style={[styles.progressFill, { width: `${item.progress}%`, backgroundColor: cat.bar }]} />
-              </View>
-              <Text style={[styles.progressPct, { color: cat.bar }]}>{item.progress}%</Text>
-            </View>
-          )}
-
-          <View style={styles.cardBottomRow}>
-            <View style={[styles.badge, { backgroundColor: cat.bg }]}>
-              <Text style={[styles.badgeText, { color: cat.text }]}>
-                {CATEGORIES[item.category].toUpperCase()}
-              </Text>
-            </View>
-            <View style={styles.cardActions}>
-              {item.status !== 'backlog' && (
-                <Text style={[
-                  styles.daysAgo,
-                  daysSince >= 5 && { color: Colors.crimson }
-                ]}>
-                  {daysSince === 0 ? 'today' : `${daysSince}d ago`}
-                </Text>
-              )}
-              <TouchableOpacity
-                onPress={() => navigation.navigate('EditItem', { itemId: item.id })}
-                activeOpacity={0.7}
-                style={styles.editBtn}
-              >
-                <Text style={styles.editBtnText}>Edit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
+        onEdit={() => navigation.navigate('EditItem', { itemId: item.id })}
+      />
     );
   }
 
@@ -140,7 +199,7 @@ export default function BacklogScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <Animated.View style={[styles.header, { opacity: headerOpacity, transform: [{ translateY: headerY }] }]}>
         <Text style={styles.heading}>My List</Text>
         <TouchableOpacity
           style={styles.addButton}
@@ -149,34 +208,36 @@ export default function BacklogScreen() {
         >
           <Text style={styles.addButtonText}>+ New</Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Filters */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {(Object.keys(FILTER_LABELS) as Filter[]).map(f => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
-            onPress={() => setFilter(f)}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-              {FILTER_LABELS[f]}
-            </Text>
-            {counts[f] > 0 && (
-              <View style={[styles.countBadge, filter === f && { backgroundColor: Colors.crimson }]}>
-                <Text style={[styles.countBadgeText, filter === f && { color: Colors.surface }]}>
-                  {counts[f]}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <Animated.View style={{ opacity: filtersOpacity, transform: [{ translateY: filtersY }] }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+        >
+          {(Object.keys(FILTER_LABELS) as Filter[]).map(f => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+              onPress={() => setFilter(f)}
+              activeOpacity={0.75}
+            >
+              <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+                {FILTER_LABELS[f]}
+              </Text>
+              {counts[f] > 0 && (
+                <View style={[styles.countBadge, filter === f && { backgroundColor: Colors.crimson }]}>
+                  <Text style={[styles.countBadgeText, filter === f && { color: Colors.surface }]}>
+                    {counts[f]}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </Animated.View>
 
       {sections.length === 0 ? (
         <View style={styles.empty}>
@@ -185,6 +246,7 @@ export default function BacklogScreen() {
         </View>
       ) : (
         <SectionList
+          key={listKey}
           sections={sections}
           keyExtractor={item => item.id}
           renderItem={renderItem}

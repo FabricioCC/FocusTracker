@@ -2,7 +2,8 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { useRef, useEffect } from 'react';
 import { Colors, Fonts } from '../theme/theme';
 
 import BacklogScreen from '../screens/BacklogScreen';
@@ -42,6 +43,26 @@ const TAB_ICONS: Record<string, string> = {
   Reminders: 'alarm-outline',
 };
 
+// Animated tab icon: scales up when focused
+function AnimatedTabIcon({ name, color, focused }: { name: any; color: string; focused: boolean }) {
+  const scale = useRef(new Animated.Value(focused ? 1 : 0.9)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: focused ? 1.15 : 0.9,
+      speed: 28,
+      bounciness: 8,
+      useNativeDriver: true,
+    }).start();
+  }, [focused]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <Ionicons name={name} size={22} color={color} />
+    </Animated.View>
+  );
+}
+
 function TabNavigator() {
   return (
     <Tab.Navigator
@@ -63,11 +84,7 @@ function TabNavigator() {
           letterSpacing: 0.3,
         },
         tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={TAB_ICONS[route.name] as any}
-              size={22}
-              color={color}
-            />
+          <AnimatedTabIcon name={TAB_ICONS[route.name] as any} color={color} focused={focused} />
         ),
       })}
     >

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform
+  StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, Animated
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getItems, updateItem } from '../storage/storage';
 import { Item, CATEGORIES, Category, CATEGORY_UNIT, CATEGORY_TOTAL_LABEL } from '../data/types';
 import { Colors, Fonts, Radius, Spacing } from '../theme/theme';
+import { useEntrance, usePressScale } from '../hooks/useEntrance';
 
 type Route = RouteProp<RootStackParamList, 'EditItem'>;
 const CATEGORY_KEYS = Object.keys(CATEGORIES) as Category[];
@@ -23,6 +24,10 @@ export default function EditItemScreen() {
   const [note, setNote] = useState('');
   const [category, setCategory] = useState<Category>('book');
   const [total, setTotal] = useState('');
+
+  // Entrance + save button animations
+  const { opacity, translateY } = useEntrance(0);
+  const { scale: saveScale, onPressIn: savePressIn, onPressOut: savePressOut } = usePressScale(0.96);
 
   useEffect(() => { loadItem(); }, []);
 
@@ -64,7 +69,10 @@ export default function EditItemScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <Animated.ScrollView
+          contentContainerStyle={styles.scroll}
+          style={{ opacity, transform: [{ translateY }] }}
+        >
 
           <Text style={styles.label}>Title</Text>
           <TextInput
@@ -121,9 +129,17 @@ export default function EditItemScreen() {
             numberOfLines={3}
           />
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-            <Text style={styles.saveBtnText}>Save Changes</Text>
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSave}
+              onPressIn={savePressIn}
+              onPressOut={savePressOut}
+              activeOpacity={1}
+            >
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            </TouchableOpacity>
+          </Animated.View>
 
           <TouchableOpacity
             style={styles.cancelBtn}
@@ -133,7 +149,7 @@ export default function EditItemScreen() {
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
 
-        </ScrollView>
+        </Animated.ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

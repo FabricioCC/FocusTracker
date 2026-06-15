@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform
+  StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, Animated
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { addItem } from '../storage/storage';
 import { CATEGORIES, Category, CATEGORY_UNIT, CATEGORY_TOTAL_LABEL } from '../data/types';
 import { Colors, Fonts, Radius, Spacing } from '../theme/theme';
+import { useEntrance, usePressScale } from '../hooks/useEntrance';
 
 const CATEGORY_KEYS = Object.keys(CATEGORIES) as Category[];
 
@@ -17,6 +18,12 @@ export default function AddItemScreen() {
   const [note, setNote] = useState('');
   const [category, setCategory] = useState<Category>('book');
   const [total, setTotal] = useState('');
+
+  // Entrance animations
+  const { opacity, translateY } = useEntrance(0);
+
+  // Save button press scale
+  const { scale: saveScale, onPressIn: savePressIn, onPressOut: savePressOut } = usePressScale(0.96);
 
   async function handleSave() {
     if (!title.trim()) {
@@ -42,7 +49,10 @@ export default function AddItemScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <Animated.ScrollView
+          contentContainerStyle={styles.scroll}
+          style={{ opacity, transform: [{ translateY }] }}
+        >
 
           <Text style={styles.label}>Title</Text>
           <TextInput
@@ -106,9 +116,17 @@ export default function AddItemScreen() {
             numberOfLines={3}
           />
 
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
-            <Text style={styles.saveBtnText}>Add to Backlog</Text>
-          </TouchableOpacity>
+          <Animated.View style={{ transform: [{ scale: saveScale }] }}>
+            <TouchableOpacity
+              style={styles.saveBtn}
+              onPress={handleSave}
+              onPressIn={savePressIn}
+              onPressOut={savePressOut}
+              activeOpacity={1}
+            >
+              <Text style={styles.saveBtnText}>Add to Backlog</Text>
+            </TouchableOpacity>
+          </Animated.View>
 
           <TouchableOpacity
             style={styles.cancelBtn}
@@ -118,7 +136,7 @@ export default function AddItemScreen() {
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
 
-        </ScrollView>
+        </Animated.ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
