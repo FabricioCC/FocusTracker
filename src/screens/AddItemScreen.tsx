@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform, Animated
+  StyleSheet, Alert, KeyboardAvoidingView, Platform, Animated
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,7 +44,13 @@ export default function AddItemScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom', 'left', 'right']}>
+      <View style={styles.topBar}>
+        <Text style={styles.topBarTitle}>New Item</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7} style={styles.closeBtn}>
+          <Text style={styles.closeBtnText}>✕</Text>
+        </TouchableOpacity>
+      </View>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
@@ -144,6 +150,14 @@ export default function AddItemScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.base },
+  topBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, paddingBottom: Spacing.md,
+    borderBottomWidth: 0.5, borderBottomColor: Colors.border,
+  },
+  topBarTitle: { fontFamily: Fonts.heading, fontSize: 18, color: Colors.ink, letterSpacing: 0.5 },
+  closeBtn: { padding: Spacing.xs },
+  closeBtnText: { fontFamily: Fonts.body, fontSize: 16, color: Colors.faded },
   scroll: { padding: Spacing.lg, gap: Spacing.sm },
   label: {
     fontFamily: Fonts.heading, fontSize: 12, color: Colors.sepia,
