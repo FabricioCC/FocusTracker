@@ -1,24 +1,40 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, TouchableOpacity,
-  StyleSheet, SafeAreaView, SectionList
+  View, Text, TouchableOpacity, StyleSheet,
+  SectionList, ScrollView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getItems } from '../storage/storage';
-import { Item, CATEGORIES, Category } from '../data/types';
+import { Item, CATEGORIES, Category, Status } from '../data/types';
 import { Colors, Fonts, Radius, Spacing } from '../theme/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-type Section = {
-  category: Category;
-  data: Item[];
+type Filter = 'all' | 'backlog' | 'active' | 'paused' | 'completed';
+
+type Section = { category: Category; data: Item[] };
+
+const FILTER_LABELS: Record<Filter, string> = {
+  all: 'All',
+  backlog: 'Backlog',
+  active: 'Active',
+  paused: 'Paused',
+  completed: 'Done',
+};
+
+const STATUS_COLORS: Record<Status, string> = {
+  backlog: Colors.faded,
+  active: Colors.forest,
+  paused: Colors.gold,
+  completed: Colors.oak,
 };
 
 export default function BacklogScreen() {
-  const [sections, setSections] = useState<Section[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [filter, setFilter] = useState<Filter>('all');
   const navigation = useNavigation<Nav>();
 
   useEffect(() => {
@@ -28,20 +44,35 @@ export default function BacklogScreen() {
 
   async function loadItems() {
     const all = await getItems();
-    const backlog = all.filter(i => i.status === 'backlog');
-
-    const grouped = Object.keys(CATEGORIES).reduce((acc, key) => {
-      const cat = key as Category;
-      const items = backlog.filter(i => i.category === cat);
-      if (items.length > 0) acc.push({ category: cat, data: items });
-      return acc;
-    }, [] as Section[]);
-
-    setSections(grouped);
+    setItems(all);
   }
+
+  const filtered = items.filter(i => {
+    if (filter === 'all') return true;
+    return i.status === filter;
+  });
+
+  const sections = Object.keys(CATEGORIES).reduce((acc, key) => {
+    const cat = key as Category;
+    const catItems = filtered.filter(i => i.category === cat);
+    if (catItems.length > 0) acc.push({ category: cat, data: catItems });
+    return acc;
+  }, [] as Section[]);
+
+  const counts: Record<Filter, number> = {
+    all: items.length,
+    backlog: items.filter(i => i.status === 'backlog').length,
+    active: items.filter(i => i.status === 'active').length,
+    paused: items.filter(i => i.status === 'paused').length,
+    completed: items.filter(i => i.status === 'completed').length,
+  };
 
   function renderItem({ item }: { item: Item }) {
     const cat = Colors.category[item.category];
+    const daysSince = Math.floor(
+      (Date.now() - new Date(item.updatedAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
+
     return (
       <TouchableOpacity
         style={styles.card}
@@ -50,8 +81,44 @@ export default function BacklogScreen() {
       >
         <View style={[styles.cardAccent, { backgroundColor: cat.bar }]} />
         <View style={styles.cardContent}>
-          <Text style={styles.title}>{item.title}</Text>
-          {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+          <View style={styles.cardTopRow}>
+            <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+            <View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[item.status] }]} />
+          </View>
+
+          {item.status !== 'backlog' && (
+            <View style={styles.progressRow}>
+              <View style={styles.progressBg}>
+                <View style={[styles.progressFill, { width: `${item.progress}%`, backgroundColor: cat.bar }]} />
+              </View>
+              <Text style={[styles.progressPct, { color: cat.bar }]}>{item.progress}%</Text>
+            </View>
+          )}
+
+          <View style={styles.cardBottomRow}>
+            <View style={[styles.badge, { backgroundColor: cat.bg }]}>
+              <Text style={[styles.badgeText, { color: cat.text }]}>
+                {CATEGORIES[item.category].toUpperCase()}
+              </Text>
+            </View>
+            <View style={styles.cardActions}>
+              {item.status !== 'backlog' && (
+                <Text style={[
+                  styles.daysAgo,
+                  daysSince >= 5 && { color: Colors.crimson }
+                ]}>
+                  {daysSince === 0 ? 'today' : `${daysSince}d ago`}
+                </Text>
+              )}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('EditItem', { itemId: item.id })}
+                activeOpacity={0.7}
+                style={styles.editBtn}
+              >
+                <Text style={styles.editBtnText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -74,7 +141,7 @@ export default function BacklogScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.heading}>Backlog</Text>
+        <Text style={styles.heading}>My List</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => navigation.navigate('AddItem')}
@@ -84,10 +151,37 @@ export default function BacklogScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Filters */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+      >
+        {(Object.keys(FILTER_LABELS) as Filter[]).map(f => (
+          <TouchableOpacity
+            key={f}
+            style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
+            onPress={() => setFilter(f)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+              {FILTER_LABELS[f]}
+            </Text>
+            {counts[f] > 0 && (
+              <View style={[styles.countBadge, filter === f && { backgroundColor: Colors.crimson }]}>
+                <Text style={[styles.countBadgeText, filter === f && { color: Colors.surface }]}>
+                  {counts[f]}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       {sections.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No scrolls yet.</Text>
-          <Text style={styles.emptySubtext}>Tap + New to begin your journey.</Text>
+          <Text style={styles.emptyTitle}>Nothing here yet.</Text>
+          <Text style={styles.emptySub}>Tap + New to add something.</Text>
         </View>
       ) : (
         <SectionList
@@ -104,106 +198,62 @@ export default function BacklogScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.base,
-  },
+  container: { flex: 1, backgroundColor: Colors.base },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.md,
-    borderBottomWidth: 0.5,
-    borderBottomColor: Colors.border,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg, paddingTop: Spacing.xl, paddingBottom: Spacing.md,
+    borderBottomWidth: 0.5, borderBottomColor: Colors.border,
   },
-  heading: {
-    fontFamily: Fonts.heading,
-    fontSize: 24,
-    color: Colors.ink,
-    letterSpacing: 1,
-  },
+  heading: { fontFamily: Fonts.heading, fontSize: 24, color: Colors.ink },
   addButton: {
-    backgroundColor: Colors.crimson,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    backgroundColor: Colors.crimson, borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
   },
-  addButtonText: {
-    fontFamily: Fonts.heading,
-    fontSize: 13,
-    color: Colors.surface,
-    letterSpacing: 1,
-  },
-  list: {
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.sm,
-  },
-  sectionBadge: {
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-  },
-  sectionBadgeText: {
-    fontFamily: Fonts.heading,
-    fontSize: 11,
-    letterSpacing: 1.5,
-  },
-  sectionCount: {
-    fontFamily: Fonts.bodyItalic,
-    fontSize: 13,
-    color: Colors.faded,
-  },
-  card: {
-    flexDirection: 'row',
+  addButtonText: { fontFamily: Fonts.heading, fontSize: 13, color: Colors.surface, letterSpacing: 0.5 },
+  filterRow: { paddingHorizontal: Spacing.lg, height: 60, paddingVertical: Spacing.md, gap: Spacing.sm },
+  filterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
+    borderRadius: Radius.md, borderWidth: 0.5, borderColor: Colors.border,
     backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 0.5,
-    borderColor: Colors.border,
-    overflow: 'hidden',
-    marginBottom: Spacing.sm,
   },
-  cardAccent: {
-    width: 4,
+  filterBtnActive: { backgroundColor: Colors.aged, borderColor: Colors.oak },
+  filterText: { fontFamily: Fonts.body, fontSize: 13, color: Colors.faded },
+  filterTextActive: { fontFamily: Fonts.bodySemiBold, color: Colors.ink },
+  countBadge: {
+    backgroundColor: Colors.aged, borderRadius: 10,
+    paddingHorizontal: 6, paddingVertical: 1,
   },
-  cardContent: {
-    flex: 1,
-    padding: Spacing.md,
-    gap: Spacing.xs,
+  countBadgeText: { fontFamily: Fonts.heading, fontSize: 10, color: Colors.sepia },
+  list: { padding: Spacing.lg },
+  sectionHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: Spacing.lg, marginBottom: Spacing.sm,
   },
-  title: {
-    fontFamily: Fonts.bodySemiBold,
-    fontSize: 15,
-    color: Colors.ink,
+  sectionBadge: { borderRadius: Radius.sm, paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs },
+  sectionBadgeText: { fontFamily: Fonts.heading, fontSize: 11, letterSpacing: 1 },
+  sectionCount: { fontFamily: Fonts.body, fontSize: 13, color: Colors.faded },
+  card: {
+    flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: Radius.md,
+    borderWidth: 0.5, borderColor: Colors.border, overflow: 'hidden', marginBottom: Spacing.sm,
   },
-  note: {
-    fontFamily: Fonts.bodyItalic,
-    fontSize: 13,
-    color: Colors.faded,
-  },
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-  },
-  emptyTitle: {
-    fontFamily: Fonts.heading,
-    fontSize: 16,
-    color: Colors.sepia,
-    letterSpacing: 1,
-  },
-  emptySubtext: {
-    fontFamily: Fonts.bodyItalic,
-    fontSize: 14,
-    color: Colors.faded,
-  },
+  cardAccent: { width: 4 },
+  cardContent: { flex: 1, padding: Spacing.md, gap: Spacing.xs },
+  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  statusDot: { width: 7, height: 7, borderRadius: 4, flexShrink: 0 },
+  title: { fontFamily: Fonts.bodySemiBold, fontSize: 15, color: Colors.ink, flex: 1, marginRight: Spacing.sm },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  progressBg: { flex: 1, height: 4, backgroundColor: Colors.aged, borderRadius: 2, overflow: 'hidden' },
+  progressFill: { height: 4, borderRadius: 2 },
+  progressPct: { fontFamily: Fonts.heading, fontSize: 11, minWidth: 30, textAlign: 'right' },
+  cardBottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  badge: { borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 2 },
+  badgeText: { fontFamily: Fonts.heading, fontSize: 10, letterSpacing: 0.5 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  daysAgo: { fontFamily: Fonts.body, fontSize: 11, color: Colors.faded },
+  editBtn: { paddingHorizontal: Spacing.sm, paddingVertical: 2 },
+  editBtnText: { fontFamily: Fonts.body, fontSize: 12, color: Colors.sepia },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
+  emptyTitle: { fontFamily: Fonts.bodySemiBold, fontSize: 16, color: Colors.sepia },
+  emptySub: { fontFamily: Fonts.body, fontSize: 14, color: Colors.faded },
 });

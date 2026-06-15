@@ -10,6 +10,7 @@ import PomodoroScreen from '../screens/PomodoroScreen';
 import NotesScreen from '../screens/NotesScreen';
 import TasksScreen from '../screens/TasksScreen';
 import RemindersScreen from '../screens/RemindersScreen';
+import EditItemScreen from '../screens/EditItemScreen';
 import AddItemScreen from '../screens/AddItemScreen';
 import ItemDetailScreen from '../screens/ItemDetailScreen';
 import AddReminderScreen from '../screens/AddReminderScreen';
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   AddItem: undefined;
   AddReminder: undefined;
   ItemDetail: { itemId: string };
+  EditItem: { itemId: string };
 };
 
 export type TabParamList = {
@@ -90,6 +92,7 @@ export default function AppNavigator({ navigationRef }: Props) {
         <Stack.Screen name="AddItem" component={AddItemScreen} options={{ title: 'New Item', presentation: 'modal' }} />
         <Stack.Screen name="AddReminder" component={AddReminderScreen} options={{ title: 'New Reminder', presentation: 'modal' }} />
         <Stack.Screen name="ItemDetail" component={ItemDetailScreen} options={{ title: 'Detail' }} />
+        <Stack.Screen name="EditItem" component={EditItemScreen} options={{ title: 'Edit Item', presentation: 'modal' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );

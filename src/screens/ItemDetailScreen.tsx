@@ -26,9 +26,6 @@ const STATUS_COLORS: Record<Status, string> = {
   completed: Colors.oak,
 };
 
-const POMODORO_WORK = 25 * 60;
-const POMODORO_BREAK = 5 * 60;
-
 export default function ItemDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute<Route>();
@@ -38,39 +35,9 @@ export default function ItemDetailScreen() {
   const [currentInput, setCurrentInput] = useState('');
   const [logNote, setLogNote] = useState('');
 
-  // pomodoro
-  const [pomodoroSeconds, setPomodoroSeconds] = useState(POMODORO_WORK);
-  const [pomodoroRunning, setPomodoroRunning] = useState(false);
-  const [isBreak, setIsBreak] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   useEffect(() => {
     loadItem();
   }, []);
-
-  // pomodoro timer
-  useEffect(() => {
-    if (pomodoroRunning) {
-      intervalRef.current = setInterval(() => {
-        setPomodoroSeconds(prev => {
-          if (prev <= 1) {
-            clearInterval(intervalRef.current!);
-            setPomodoroRunning(false);
-            const nextIsBreak = !isBreak;
-            setIsBreak(nextIsBreak);
-            setPomodoroSeconds(nextIsBreak ? POMODORO_BREAK : POMODORO_WORK);
-            return nextIsBreak ? POMODORO_BREAK : POMODORO_WORK;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [pomodoroRunning, isBreak]);
 
   async function loadItem() {
     const all = await getItems();
@@ -102,25 +69,10 @@ export default function ItemDetailScreen() {
     await loadItem();
   }
 
-  function formatPomodoro(seconds: number) {
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = (seconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  }
-
-  function resetPomodoro() {
-    setPomodoroRunning(false);
-    setIsBreak(false);
-    setPomodoroSeconds(POMODORO_WORK);
-  }
-
   if (!item) return null;
 
   const cat = Colors.category[item.category];
   const unit = CATEGORY_UNIT[item.category];
-  const pomodoroProgress = isBreak
-    ? 1 - pomodoroSeconds / POMODORO_BREAK
-    : 1 - pomodoroSeconds / POMODORO_WORK;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -186,44 +138,6 @@ export default function ItemDetailScreen() {
             </TouchableOpacity>
           </View>
         )}
-
-        <View style={styles.divider} />
-
-        {/* Pomodoro */}
-        <Text style={styles.sectionLabel}>Pomodoro</Text>
-        <View style={styles.pomodoroCard}>
-          <Text style={styles.pomodoroMode}>{isBreak ? 'Break' : 'Focus'}</Text>
-          <Text style={styles.pomodoroTime}>{formatPomodoro(pomodoroSeconds)}</Text>
-
-          <View style={styles.pomodoroBarBg}>
-            <View style={[
-              styles.pomodoroBarFill,
-              {
-                width: `${pomodoroProgress * 100}%`,
-                backgroundColor: isBreak ? Colors.forest : Colors.crimson,
-              }
-            ]} />
-          </View>
-
-          <View style={styles.pomodoroButtons}>
-            <TouchableOpacity
-              style={[styles.pomodoroBtn, { backgroundColor: isBreak ? Colors.forest : Colors.crimson }]}
-              onPress={() => setPomodoroRunning(r => !r)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.pomodoroBtnText}>
-                {pomodoroRunning ? 'Pause' : 'Start'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.pomodoroResetBtn}
-              onPress={resetPomodoro}
-              activeOpacity={0.75}
-            >
-              <Text style={styles.pomodoroResetText}>Reset</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
         <View style={styles.divider} />
 
